@@ -55,6 +55,7 @@ static inline void blk_clear_rq_complete(struct request *rq)
 	clear_bit(REQ_ATOM_COMPLETE, &rq->atomic_flags);
 }
 
+
 /*
  * Internal elevator interface
  */
