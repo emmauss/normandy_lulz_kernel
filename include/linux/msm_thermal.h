@@ -22,7 +22,7 @@ struct msm_thermal_data {
 	uint32_t limit_freq;
 };
 
-#if defined(CONFIG_THERMAL_MONITOR) || defined(CONFIG_INTELLI_THERMAL)
+#ifdef CONFIG_THERMAL_MONITOR
 extern int msm_thermal_init(struct msm_thermal_data *pdata);
 #else
 static inline int msm_thermal_init(struct msm_thermal_data *pdata)
