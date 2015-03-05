@@ -58,8 +58,11 @@ module_param(intelli_plug_active, uint, 0644);
 static unsigned int touch_boost_active = 1;
 module_param(touch_boost_active, uint, 0644);
 
-static unsigned int nr_run_profile_sel = 0;
+static unsigned int nr_run_profile_sel = 3;
 module_param(nr_run_profile_sel, uint, 0644);
+
+static unsigned int screen_off_max = 700800;
+module_param(screen_off_max, uint, 0644);
 
 //default to something sane rather than zero
 static unsigned int sampling_time = DEF_SAMPLING_MS;
@@ -76,8 +79,8 @@ struct ip_cpu_info {
 
 static DEFINE_PER_CPU(struct ip_cpu_info, ip_info);
 
-static unsigned int screen_off_max = UINT_MAX;
-module_param(screen_off_max, uint, 0644);
+// static unsigned int screen_off_max = UINT_MAX;
+// module_param(screen_off_max, uint, 0644);
 
 #define CAPACITY_RESERVE	50
 
