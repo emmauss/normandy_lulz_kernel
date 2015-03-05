@@ -59,6 +59,7 @@ static void check_temp(struct work_struct *work)
 	int ret = 0;
 
 	tsens_dev.sensor_num = msm_thermal_info.sensor_id;
+	ret = tsens_get_temp(&tsens_dev, &temp);
 	if (ret) {
 		pr_debug("msm_thermal: Unable to read TSENS sensor %d\n",
 				tsens_dev.sensor_num);
