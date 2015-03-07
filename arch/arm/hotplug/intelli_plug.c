@@ -61,7 +61,7 @@ module_param(touch_boost_active, uint, 0644);
 static unsigned int nr_run_profile_sel = 3;
 module_param(nr_run_profile_sel, uint, 0644);
 
-static unsigned int screen_off_max = 700800;
+static unsigned int screen_off_max = 806400;
 module_param(screen_off_max, uint, 0644);
 
 //default to something sane rather than zero
