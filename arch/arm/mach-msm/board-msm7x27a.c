@@ -1262,6 +1262,32 @@ void test_flash(void)
 }
 #endif
 
+#ifdef CONFIG_INPUT_KEYRESET
+#include <linux/keyreset.h>
+/* keyreset platform device */
+static int msm7x27a_reset_keys_up[] = {
+	KEY_VOLUMEDOWN,
+	0
+};
+
+static struct keyreset_platform_data msm7x27a_reset_keys_pdata = {
+	.keys_up = msm7x27a_reset_keys_up,
+	.keys_down = {
+		KEY_POWER,
+		KEY_VOLUMEUP,
+		0
+	},
+};
+
+struct platform_device msm7x27a_reset_keys_device = {
+	.name = KEYRESET_NAME,
+	.dev = {
+	.platform_data = &msm7x27a_reset_keys_pdata,
+	},
+};
+#endif
+
+
 static void __init msm7x2x_init(void)
 {
     gpio_set_value(13, 0);
@@ -1295,6 +1321,9 @@ static void __init msm7x2x_init(void)
 #endif
 	msm7627a_camera_init();
 	msm7627a_sensor_init();
+#ifdef CONFIG_INPUT_KEYRESET
+	platform_device_register(&msm7x27a_reset_keys_device);
+#endif
 	msm7627a_add_io_devices();
 	/*7x25a kgsl initializations*/
 	msm7x25a_kgsl_3d0_init();
