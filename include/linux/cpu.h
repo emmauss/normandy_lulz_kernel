@@ -147,7 +147,7 @@ static inline int register_cpu_notifier(struct notifier_block *nb)
 {
 	return 0;
 }
-+
+
 static inline int __register_cpu_notifier(struct notifier_block *nb)
 {
 	return 0;
@@ -157,7 +157,7 @@ static inline int __register_cpu_notifier(struct notifier_block *nb)
 static inline void unregister_cpu_notifier(struct notifier_block *nb)
 {
 }
-+
+
 static inline void __unregister_cpu_notifier(struct notifier_block *nb)
 {
 }
