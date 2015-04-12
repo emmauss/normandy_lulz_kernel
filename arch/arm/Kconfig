@@ -1505,7 +1505,6 @@ config ARM_ERRATA_775420
 endmenu
 
 source "arch/arm/common/Kconfig"
-source "arch/arm/hotplug/Kconfig"
 
 menu "Bus support"
 
@@ -2304,6 +2303,8 @@ config AUTO_ZRELADDR
 endmenu
 
 menu "CPU Power Management"
+
+source "arch/arm/hotplug/Kconfig"
 
 if ARCH_HAS_CPUFREQ
 
