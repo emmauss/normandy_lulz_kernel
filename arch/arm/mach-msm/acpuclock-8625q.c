@@ -88,9 +88,11 @@ static struct acpu_clk_src pll_clk[ACPU_PLL_END] = {
 
 static struct pll_config pll4_cfg_tbl[] = {
 	[0] = {  36, 1, 2 }, /*  700.8 MHz */
-	[1] = {  52, 1, 2 }, /* 1008 MHz */
+	[1] = {  51, 1, 2 }, /* 1008 MHz */
 	[2] = {  63, 0, 1 }, /* 1209.6 MHz */
 	[3] = {  73, 0, 1 }, /* 1401.6 MHz */
+	[4] = {  60, 0, 1 }, /* 1152 MHz */
+	[5] = {  57, 1, 2 }, /* 1104 MHz */
 };
 
 struct clock_state {
@@ -252,6 +254,10 @@ static void acpuclk_set_div(const struct clkctl_acpu_speed *hunt_s)
 	clk_div = (reg_clksel >> 1) & 0x03;
 	/* CLK_SEL_SRC1NO */
 	src_sel = reg_clksel & 1;
+	if(hunt_s->a11clk_khz > 1008000) {
+                	writel(hunt_s->a11clk_khz/19200, pll_clk[ACPU_PLL_4].clk); /* This is where real Overclock happens */
+                	udelay(50);
+	}
 
 	/*
 	 * If the new clock divider is higher than the previous, then

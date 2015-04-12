@@ -35,6 +35,7 @@
 
 #define INTELLI_PLUG_MAJOR_VERSION	4
 #define INTELLI_PLUG_MINOR_VERSION	0
+#define INTELLI_PLUG_RELMOD_VERSION	1
 
 #define DEF_SAMPLING_MS			(268)
 
@@ -335,102 +336,64 @@ static void __ref intelli_plug_work_fn(struct work_struct *work)
 }
 
 #if defined(CONFIG_POWERSUSPEND) || defined(CONFIG_HAS_EARLYSUSPEND)
+
+#ifdef CONFIG_TURBO_BOOST
+extern int msm_turbo_active(int);
+int tactive;
+extern int tactive;
+#endif
+
 static void screen_off_limit(bool on)
 {
-	unsigned int cpu;
-	struct cpufreq_policy *policy;
-	struct ip_cpu_info *l_ip_info;
 
-	/* not active, so exit */
-	if (screen_off_max == UINT_MAX)
+#ifdef CONFIG_TURBO_BOOST
+	tactive = msm_turbo_active(tactive);
+
+	if (tactive) 
 		return;
-
-	for_each_online_cpu(cpu) {
-		l_ip_info = &per_cpu(ip_info, cpu);
-		policy = cpufreq_cpu_get(0);
-
-		if (on) {
-			/* save current instance */
-			l_ip_info->cur_max = policy->max;
-			policy->max = screen_off_max;
-			policy->cpuinfo.max_freq = screen_off_max;
-#ifdef DEBUG_INTELLI_PLUG
-			pr_info("cpuinfo max is (on): %u %u\n",
-				policy->cpuinfo.max_freq, l_ip_info->sys_max);
+	else {
 #endif
-		} else {
-			/* restore */
-			if (cpu != 0) {
-				l_ip_info = &per_cpu(ip_info, 0);
-			}
-			policy->cpuinfo.max_freq = l_ip_info->sys_max;
-			policy->max = l_ip_info->cur_max;
+
+		unsigned int cpu;
+		struct cpufreq_policy *policy;
+		struct ip_cpu_info *l_ip_info;
+
+		/* not active, so exit */
+		if (screen_off_max == UINT_MAX)
+			return;
+
+		for_each_online_cpu(cpu) {
+			l_ip_info = &per_cpu(ip_info, cpu);
+			policy = cpufreq_cpu_get(0);
+
+			if (on) {
+				/* save current instance */
+				l_ip_info->cur_max = policy->max;
+				policy->max = screen_off_max;
+				policy->cpuinfo.max_freq = screen_off_max;
 #ifdef DEBUG_INTELLI_PLUG
-			pr_info("cpuinfo max is (off): %u %u\n",
-				policy->cpuinfo.max_freq, l_ip_info->sys_max);
+				pr_info("cpuinfo max is (on): %u %u\n",
+					policy->cpuinfo.max_freq, l_ip_info->sys_max);
 #endif
-		}
-		cpufreq_update_policy(cpu);
-	}
-}
-
-void __ref intelli_plug_perf_boost(bool on)
-{
-	unsigned int cpu;
-
-	if (intelli_plug_active) {
-		flush_workqueue(intelliplug_wq);
-		if (on) {
-			for_each_possible_cpu(cpu) {
-				if (!cpu_online(cpu))
-					cpu_up(cpu);
+			} else {
+				/* restore */
+				if (cpu != 0) {
+					l_ip_info = &per_cpu(ip_info, 0);
+				}
+				policy->cpuinfo.max_freq = l_ip_info->sys_max;
+				policy->max = l_ip_info->cur_max;
+#ifdef DEBUG_INTELLI_PLUG
+				pr_info("cpuinfo max is (off): %u %u\n",
+					policy->cpuinfo.max_freq, l_ip_info->sys_max);
+#endif
 			}
-		} else {
-			queue_delayed_work_on(0, intelliplug_wq,
-				&intelli_plug_work,
-				msecs_to_jiffies(sampling_time));
+			cpufreq_update_policy(cpu);
 		}
+
+#ifdef CONFIG_TURBO_BOOST
 	}
+#endif
 }
-
-/* sysfs interface for performance boost (BEGIN) */
-static ssize_t intelli_plug_perf_boost_store(struct kobject *kobj,
-			struct kobj_attribute *attr, const char *buf,
-			size_t count)
-{
-
-	int boost_req;
-
-	sscanf(buf, "%du", &boost_req);
-
-	switch(boost_req) {
-		case 0:
-			intelli_plug_perf_boost(0);
-			return count;
-		case 1:
-			intelli_plug_perf_boost(1);
-			return count;
-		default:
-			return -EINVAL;
-	}
-}
-
-static struct kobj_attribute intelli_plug_perf_boost_attribute =
-	__ATTR(perf_boost, 0220,
-		NULL,
-		intelli_plug_perf_boost_store);
-
-static struct attribute *intelli_plug_perf_boost_attrs[] = {
-	&intelli_plug_perf_boost_attribute.attr,
-	NULL,
-};
-
-static struct attribute_group intelli_plug_perf_boost_attr_group = {
-	.attrs = intelli_plug_perf_boost_attrs,
-};
-
-static struct kobject *intelli_plug_perf_boost_kobj;
-/* sysfs interface for performance boost (END) */
 
 #ifdef CONFIG_POWERSUSPEND
 static void intelli_plug_suspend(struct power_suspend *handler)
@@ -599,9 +562,10 @@ int __init intelli_plug_init(void)
 
 	nr_possible_cores = num_possible_cpus();
 
-	pr_info("intelli_plug: version %d.%d by faux123\n",
+	pr_info("intelli_plug: version %d.%d.m%d_nokia by faux123(modded by lukino563)\n",
 		 INTELLI_PLUG_MAJOR_VERSION,
-		 INTELLI_PLUG_MINOR_VERSION);
+		 INTELLI_PLUG_MINOR_VERSION,
+		 INTELLI_PLUG_RELMOD_VERSION);
 
 	if (nr_possible_cores > 2) {
 		nr_run_hysteresis = NR_RUN_HYSTERESIS_QUAD;
@@ -633,19 +597,6 @@ int __init intelli_plug_init(void)
 	INIT_DELAYED_WORK(&intelli_plug_boost, intelli_plug_boost_fn);
 	queue_delayed_work_on(0, intelliplug_wq, &intelli_plug_work,
 		msecs_to_jiffies(10));
-
-	intelli_plug_perf_boost_kobj
-		= kobject_create_and_add("intelli_plug", kernel_kobj);
-
-	if (!intelli_plug_perf_boost_kobj) {
-		return -ENOMEM;
-	}
-
-	rc = sysfs_create_group(intelli_plug_perf_boost_kobj,
-				&intelli_plug_perf_boost_attr_group);
-
-	if (rc)
-		kobject_put(intelli_plug_perf_boost_kobj);
 
 	return 0;
 }

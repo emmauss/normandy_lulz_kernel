@@ -62,11 +62,19 @@ struct cpu_freq {
 
 static DEFINE_PER_CPU(struct cpu_freq, cpu_freq_info);
 
+#ifdef CONFIG_TURBO_BOOST
+extern int msm_turbo(int);
+#endif
+
 static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq)
 {
 	int ret = 0;
 	struct cpufreq_freqs freqs;
 	struct cpu_freq *limit = &per_cpu(cpu_freq_info, policy->cpu);
+
+#ifdef CONFIG_TURBO_BOOST
+	new_freq = msm_turbo(new_freq);
+#endif
 
 	if (limit->limits_init) {
 		if (new_freq > limit->allowed_max) {
@@ -249,6 +257,10 @@ int msm_cpufreq_set_freq_limits(uint32_t cpu, uint32_t min, uint32_t max)
 }
 EXPORT_SYMBOL(msm_cpufreq_set_freq_limits);
 
+#ifdef CONFIG_CPU_OVERCLOCK
+#define OC_CPU_FREQ_MAX	1104000
+#endif
+
 static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 {
 	int cur_freq;
@@ -273,12 +285,21 @@ static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 	if (cpufreq_frequency_table_cpuinfo(policy, table)) {
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
 		policy->cpuinfo.min_freq = CONFIG_MSM_CPU_FREQ_MIN;
+#ifdef CONFIG_CPU_OVERCLOCK
+		policy->cpuinfo.max_freq = OC_CPU_FREQ_MAX;
+#else
 		policy->cpuinfo.max_freq = CONFIG_MSM_CPU_FREQ_MAX;
 #endif
+#endif
+
 	}
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
 	policy->min = CONFIG_MSM_CPU_FREQ_MIN;
+#ifdef CONFIG_CPU_OVERCLOCK
+	policy->max = OC_CPU_FREQ_MAX;
+#else
 	policy->max = CONFIG_MSM_CPU_FREQ_MAX;
+#endif
 #endif
 
 	cur_freq = acpuclk_get_rate(policy->cpu);

@@ -1,7 +1,20 @@
 config INTELLI_PLUG
-        bool "Enable intelli-plug cpu hotplug driver"
-        default n
+        bool "Enable IntelliPlug CPU hotplug driver"
+        default y
         help
           Generic Intelli-plug cpu hotplug driver for ARM SOCs
 
+config CPU_BOOST
+        bool "Enable CPU Boost driver (compatible with IntelliPlug)"
+        default y
 
+config CPU_OVERCLOCK
+	bool "Enable CPU Overclock"
+	default y
+
+config TURBO_BOOST
+	bool "Enable CPU Turbo boost option"
+	default y
+	help
+	This option allows overclocking (if overclock enabled) of 1 core to higher clock rate
+	than stock maximum. When 2 cores are active, the clock is limited to stock max speeds

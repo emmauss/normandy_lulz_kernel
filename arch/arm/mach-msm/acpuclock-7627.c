@@ -93,6 +93,8 @@ static struct pll_config pll4_cfg_tbl[] = {
 	[5] = {  57, 1, 2 }, /* 1104 MHz */
 	[6] = {  42, 1, 2 }, /* 806.4 MHz */
 	[7] = {  47, 1, 2 }, /* 902.4 MHz */
+	[8] = {  53, 0, 1 }, /* 1055 MHz */
+	[9] = {  54, 0, 1 }, /* 1104 MHz */
 };
 
 struct clock_state {
@@ -328,6 +330,10 @@ static struct clkctl_acpu_speed pll0_960_pll1_245_pll2_1200_pll4_1008_2p0[] = {
 	{ 1, 806400, ACPU_PLL_4, 6, 0, 95000, 3, 4, 160000, &pll4_cfg_tbl[6]},
 	{ 1, 902400, ACPU_PLL_4, 6, 0, 107500, 3, 5, 160000, &pll4_cfg_tbl[7]},
 	{ 1, 1008000, ACPU_PLL_4, 6, 0, 120000, 3, 5, 200000, &pll4_cfg_tbl[1]},
+#ifdef CONFIG_CPU_OVERCLOCK
+	{ 1, 1050000, ACPU_PLL_4, 6, 0, 132700, 3, 6, 200000, &pll4_cfg_tbl[8]},
+	{ 1, 1104000, ACPU_PLL_4, 6, 0, 145200, 3, 6, 200000, &pll4_cfg_tbl[9]},
+#endif
 	{ 0 }
 };
 
@@ -625,6 +631,11 @@ static void acpuclk_set_div(const struct clkctl_acpu_speed *hunt_s)
 	clk_div = (reg_clksel >> 1) & 0x03;
 	/* CLK_SEL_SRC1NO */
 	src_sel = reg_clksel & 1;
+	// Real OverClock 
+	if(hunt_s->a11clk_khz > 1008000) {
+                	writel(hunt_s->a11clk_khz/19200, pll_clk[ACPU_PLL_4].clk); /* This is where real Overclock happens */
+                	udelay(50);
+	}
 
 	/*
 	 * If the new clock divider is higher than the previous, then
@@ -1040,6 +1051,46 @@ static void __devinit select_freq_plan(void)
 			}
 		}
 	}
+
+#ifdef CONFIG_CPU_OVERCLOCK
+	/*
+	* When PLL4 can run max @ 1055 MHz, we have to support
+	* dynamic reprograming of PLL4.
+	*
+	* Also find the backup pll used during PLL4 reprogramming.
+	* We are using PLL2@600MHz as backup PLL, since 800MHz jump
+	* is fine.
+	*/
+ 	if (t->pll4_rate == 1055) {
+ 		dynamic_reprogram = 1;
+ 		for ( ; t->tbl->a11clk_khz; t->tbl++) {
+ 			if (t->tbl->pll == ACPU_PLL_2 &&
+ 					t->tbl->a11clk_src_div == 1) {
+ 				backup_s = t->tbl;
+ 				break;
+ 			}
+ 		}
+	}
+
+	/*
+	* When PLL4 can run max @ 1104 MHz, we have to support
+	* dynamic reprograming of PLL4.
+	*
+	* Also find the backup pll used during PLL4 reprogramming.
+	* We are using PLL2@600MHz as backup PLL, since 800MHz jump
+	* is fine.
+	*/
+ 	if (t->pll4_rate == 1104) {
+ 		dynamic_reprogram = 1;
+ 		for ( ; t->tbl->a11clk_khz; t->tbl++) {
+ 			if (t->tbl->pll == ACPU_PLL_2 &&
+ 					t->tbl->a11clk_src_div == 1) {
+ 				backup_s = t->tbl;
+ 				break;
+ 			}
+ 		}
+	}
+#endif
 
 	if (acpu_freq_tbl == NULL) {
 		pr_crit("Unknown PLL configuration!\n");
