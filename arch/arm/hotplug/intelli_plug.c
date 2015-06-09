@@ -21,6 +21,8 @@
 #include <linux/slab.h>
 #include <linux/input.h>
 #include <linux/cpufreq.h>
+#include <linux/kernel.h>
+#include <linux/cpumask.h>
 
 #ifdef CONFIG_POWERSUSPEND
 #include <linux/powersuspend.h>
@@ -35,7 +37,7 @@
 
 #define INTELLI_PLUG_MAJOR_VERSION	4
 #define INTELLI_PLUG_MINOR_VERSION	0
-#define INTELLI_PLUG_RELMOD_VERSION	1
+#define INTELLI_PLUG_RELMOD_VERSION	5
 
 #define DEF_SAMPLING_MS			(268)
 
@@ -44,6 +46,13 @@
 #define QUAD_PERSISTENCE		(1000 / DEF_SAMPLING_MS)
 
 #define BUSY_PERSISTENCE		(3500 / DEF_SAMPLING_MS)
+
+#define A_FREQ_BEFORE		122880
+#define A_FREQ_AFTER		245760
+#define B_FREQ_BEFORE		320000
+#define B_FREQ_AFTER		700800
+#define C_FREQ_BEFORE		480000
+#define MAX_CPU_FREQ		1008000
 
 static DEFINE_MUTEX(intelli_plug_mutex);
 
@@ -61,6 +70,13 @@ module_param(touch_boost_active, uint, 0664);
 
 static unsigned int nr_run_profile_sel = 0;
 module_param(nr_run_profile_sel, uint, 0664);
+
+static unsigned int intelli_msm_turbo_active = 1;
+
+#ifdef CONFIG_CPU_OVERCLOCK
+static unsigned int mc_oc_disabled = 0;
+module_param(mc_oc_disabled, uint, 0664);
+#endif
 
 //default to something sane rather than zero
 static unsigned int sampling_time = DEF_SAMPLING_MS;
@@ -337,62 +353,51 @@ static void __ref intelli_plug_work_fn(struct work_struct *work)
 
 #if defined(CONFIG_POWERSUSPEND) || defined(CONFIG_HAS_EARLYSUSPEND)
 
-#ifdef CONFIG_TURBO_BOOST
-extern int msm_turbo_active(int);
-int tactive;
-extern int tactive;
-#endif
-
 static void screen_off_limit(bool on)
 {
 
-#ifdef CONFIG_TURBO_BOOST
-	tactive = msm_turbo_active(tactive);
+	unsigned int cpu;
+	struct cpufreq_policy *policy;
+	struct ip_cpu_info *l_ip_info;
 
-	if (tactive) 
+	/* not active, so exit */
+	if (screen_off_max == UINT_MAX) {
+		intelli_msm_turbo_active = 1;
 		return;
-	else {
-#endif
-
-		unsigned int cpu;
-		struct cpufreq_policy *policy;
-		struct ip_cpu_info *l_ip_info;
-
-		/* not active, so exit */
-		if (screen_off_max == UINT_MAX)
-			return;
-
-		for_each_online_cpu(cpu) {
-			l_ip_info = &per_cpu(ip_info, cpu);
-			policy = cpufreq_cpu_get(0);
-
-			if (on) {
-				/* save current instance */
-				l_ip_info->cur_max = policy->max;
-				policy->max = screen_off_max;
-				policy->cpuinfo.max_freq = screen_off_max;
-#ifdef DEBUG_INTELLI_PLUG
-				pr_info("cpuinfo max is (on): %u %u\n",
-					policy->cpuinfo.max_freq, l_ip_info->sys_max);
-#endif
-			} else {
-				/* restore */
-				if (cpu != 0) {
-					l_ip_info = &per_cpu(ip_info, 0);
-				}
-				policy->cpuinfo.max_freq = l_ip_info->sys_max;
-				policy->max = l_ip_info->cur_max;
-#ifdef DEBUG_INTELLI_PLUG
-				pr_info("cpuinfo max is (off): %u %u\n",
-					policy->cpuinfo.max_freq, l_ip_info->sys_max);
-#endif
-			}
-			cpufreq_update_policy(cpu);
-		}
-
-#ifdef CONFIG_TURBO_BOOST
 	}
+
+	for_each_online_cpu(cpu) {
+		l_ip_info = &per_cpu(ip_info, cpu);
+		policy = cpufreq_cpu_get(0);
+
+		if (on) {
+
+			intelli_msm_turbo_active = 0;
+			/* save current instance */
+			l_ip_info->cur_max = policy->max;
+			policy->max = screen_off_max;
+			policy->cpuinfo.max_freq = screen_off_max;
+#ifdef DEBUG_INTELLI_PLUG
+			pr_info("cpuinfo max is (on): %u %u\n",
+				policy->cpuinfo.max_freq, l_ip_info->sys_max);
 #endif
+		} else {
+
+			intelli_msm_turbo_active = 1;
+			/* restore */
+			if (cpu != 0) {
+				l_ip_info = &per_cpu(ip_info, 0);
+			}
+			policy->cpuinfo.max_freq = l_ip_info->sys_max;
+			policy->max = l_ip_info->cur_max;
+#ifdef DEBUG_INTELLI_PLUG
+			pr_info("cpuinfo max is (off): %u %u\n",
+				policy->cpuinfo.max_freq, l_ip_info->sys_max);
+#endif
+		}
+		cpufreq_update_policy(cpu);
+
+	}
 }
 
 #ifdef CONFIG_POWERSUSPEND
@@ -601,7 +606,32 @@ int __init intelli_plug_init(void)
 	return 0;
 }
 
-MODULE_AUTHOR("Paul Reioux <reioux@gmail.com>");
+int msm_turbo(int cpufreq)
+{
+	if (intelli_msm_turbo_active) {
+		if (num_online_cpus() == 2) {
+			if (cpufreq == A_FREQ_BEFORE) {
+				cpufreq = A_FREQ_AFTER;
+				cpu_down(1);
+			} else if (cpufreq == B_FREQ_BEFORE) {
+				cpufreq = B_FREQ_AFTER;
+				cpu_down(1);
+			} else if (cpufreq == C_FREQ_BEFORE) {
+				cpufreq = MAX_CPU_FREQ;
+				cpu_down(1);
+#ifndef CONFIG_CPU_OVERCLOCK
+			}
+#else
+			} else if (cpufreq > MAX_CPU_FREQ)
+				 if (mc_oc_disabled)
+					cpufreq = MAX_CPU_FREQ;
+#endif
+		}
+	}
+	return cpufreq;
+}
+
+MODULE_AUTHOR("Paul Reioux <reioux@gmail.com> (edit: Lukáš Machata <lukino563@gmail.com>");
 MODULE_DESCRIPTION("'intell_plug' - An intelligent cpu hotplug driver for "
 	"Low Latency Frequency Transition capable processors");
 MODULE_LICENSE("GPL");
