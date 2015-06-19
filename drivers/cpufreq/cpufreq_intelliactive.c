@@ -34,6 +34,8 @@
 #include <asm/cputime.h>
 #include <linux/input.h>
 
+#define MAX_CORES (2)
+
 static int active_count;
 
 struct cpufreq_interactive_cpuinfo {
@@ -130,10 +132,10 @@ static bool io_is_busy = 1;
  * sync_freq
  */
 static unsigned int up_threshold_any_cpu_load = 95;
-static unsigned int sync_freq = 729600;
-static unsigned int up_threshold_any_cpu_freq = 960000;
+static unsigned int sync_freq = 245760;
+static unsigned int up_threshold_any_cpu_freq = 320000;
 
-static int two_phase_freq_array[NR_CPUS] = {[0 ... NR_CPUS-1] = 1728000} ;
+static int two_phase_freq_array[MAX_CORES] = {[0 ... MAX_CORES-1] = 700800} ;
 
 static int cpufreq_governor_intelliactive(struct cpufreq_policy *policy,
 		unsigned int event);
@@ -430,8 +432,6 @@ static void cpufreq_interactive_timer(unsigned long data)
 	cpu_load = loadadjfreq / pcpu->target_freq;
 	pcpu->prev_load = cpu_load;
 	boosted = boost_val || now < boostpulse_endtime;
-
-	cpufreq_notify_utilization(pcpu->policy, cpu_load);
 
 	if (counter < 5) {
 		counter++;
@@ -820,7 +820,7 @@ static ssize_t show_two_phase_freq
 	int i = 0 ;
 	int shift = 0 ;
 	char *buf_pos = buf;
-	for ( i = 0 ; i < NR_CPUS; i++) {
+	for ( i = 0 ; i < MAX_CORES; i++) {
 		shift = sprintf(buf_pos,"%d,",two_phase_freq_array[i]);
 		buf_pos += shift;
 	}
@@ -833,17 +833,9 @@ static ssize_t store_two_phase_freq(struct kobject *a, struct attribute *b,
 {
 
 	int ret = 0;
-	if (NR_CPUS == 1)
-		ret = sscanf(buf,"%u",&two_phase_freq_array[0]);
-	else if (NR_CPUS == 2)
-		ret = sscanf(buf,"%u,%u",&two_phase_freq_array[0],
-				&two_phase_freq_array[1]);
-	else if (NR_CPUS == 4)
-		ret = sscanf(buf, "%u,%u,%u,%u", &two_phase_freq_array[0],
-				&two_phase_freq_array[1],
-				&two_phase_freq_array[2],
-				&two_phase_freq_array[3]);
-	if (ret < NR_CPUS)
+	ret = sscanf(buf,"%u,%u",&two_phase_freq_array[0],
+				 &two_phase_freq_array[1]);
+	if (ret < MAX_CORES)
 		return -EINVAL;
 
 	return count;
@@ -866,7 +858,8 @@ static ssize_t show_target_loads(
 		ret += sprintf(buf + ret, "%u%s", target_loads[i],
 			       i & 0x1 ? ":" : " ");
 
-	sprintf(buf + ret - 1, "\n");
+	--ret;
+	ret += sprintf(buf + ret, "\n");
 	spin_unlock_irqrestore(&target_loads_lock, flags);
 	return ret;
 }
@@ -908,8 +901,9 @@ static ssize_t show_above_hispeed_delay(
 	for (i = 0; i < nabove_hispeed_delay; i++)
 		ret += sprintf(buf + ret, "%u%s", above_hispeed_delay[i],
 			       i & 0x1 ? ":" : " ");
-
-	sprintf(buf + ret - 1, "\n");
+	
+	--ret;
+	ret += sprintf(buf + ret, "\n");
 	spin_unlock_irqrestore(&above_hispeed_delay_lock, flags);
 	return ret;
 }
@@ -1549,5 +1543,3 @@ MODULE_AUTHOR("Paul Reioux <reioux@gmail.com>");
 MODULE_DESCRIPTION("'cpufreq_intelliactive' - A cpufreq governor for "
 	"Latency sensitive workloads based on Google's Interactive");
 MODULE_LICENSE("GPL");
-
-

@@ -29,7 +29,7 @@
 #include <linux/workqueue.h>
 #include <linux/slab.h>
 
-#define DEF_SAMPLING_RATE			(50000)
+#define DEF_SAMPLING_RATE			(120000)
 #define DEF_FREQUENCY_DOWN_DIFFERENTIAL		(10)
 #define DEF_FREQUENCY_UP_THRESHOLD		(80)
 #define DEF_SAMPLING_DOWN_FACTOR		(1)
@@ -41,21 +41,12 @@
 #define MAX_FREQUENCY_UP_THRESHOLD		(100)
 #define MIN_FREQUENCY_DOWN_DIFFERENTIAL		(1)
 
-#ifdef CONFIG_ARCH_MSM8974
-#define DEF_POWER_SAVE_FREQUENCY		(1100000)
-#define DEF_TWO_PHASE_FREQUENCY			(1700000)
-#define DBS_INPUT_EVENT_MIN_FREQ		(1574400)
-#define DEF_FREQUENCY_OPTIMAL			(1190400)
-#define DEF_FREQ_DOWN_STEP			(550000)
-#define DEF_FREQ_DOWN_STEP_BARRIER		(1190400)
-#else
-#define DEF_POWER_SAVE_FREQUENCY		(750000)
-#define DEF_TWO_PHASE_FREQUENCY			(1300000)
-#define DBS_INPUT_EVENT_MIN_FREQ		(1026000)
-#define DEF_FREQUENCY_OPTIMAL			(702000)
-#define DEF_FREQ_DOWN_STEP			(250000)
-#define DEF_FREQ_DOWN_STEP_BARRIER		(702000)
-#endif
+#define DEF_POWER_SAVE_FREQUENCY		(480000)
+#define DEF_TWO_PHASE_FREQUENCY			(806400)
+#define DBS_INPUT_EVENT_MIN_FREQ		(700800)
+#define DEF_FREQUENCY_OPTIMAL			(122880)
+#define DEF_FREQ_DOWN_STEP			(320000)
+#define DEF_FREQ_DOWN_STEP_BARRIER		(700800)
 
 #define DEF_INPUT_BOOST_DURATION		(6)
 #define CPU0					(0)
@@ -979,7 +970,7 @@ static void dbs_freq_increase(struct cpufreq_policy *p, unsigned int freq)
 			CPUFREQ_RELATION_L : CPUFREQ_RELATION_H);
 }
 
-int input_event_boosted_minmax(void)
+int input_event_boosted(void)
 {
 	unsigned long flags;
 
@@ -1128,7 +1119,7 @@ set_freq:
 	}
 
 	// shortcuts
-	if (input_event_boosted_minmax()) {
+	if (input_event_boosted()) {
 		return;
 	}
 
@@ -1236,7 +1227,7 @@ static void do_dbs_timer(struct work_struct *work)
 		}
 	} else {
 		delay = dbs_info->freq_lo_jiffies;
-		if (input_event_boosted_minmax())
+		if (input_event_boosted())
 			goto sched_wait;
 
 		__cpufreq_driver_target(dbs_info->cur_policy,
@@ -1671,5 +1662,4 @@ fs_initcall(cpufreq_gov_dbs_init);
 module_init(cpufreq_gov_dbs_init);
 #endif
 module_exit(cpufreq_gov_dbs_exit);
-
 
