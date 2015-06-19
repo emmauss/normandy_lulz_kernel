@@ -8,49 +8,26 @@
 #include <linux/cpumask.h>
 #include <linux/cpu.h>
 
-static unsigned int turbo_active = 1;
-module_param(turbo_active, uint, 0664);
+extern int turbo_start_dec(int);
 
-#ifdef CONFIG_CPU_OVERCLOCK
-static unsigned int mc_oc_disabled = 0;
-module_param(mc_oc_disabled, uint, 0664);
-#endif
-
-#define FST_FREQ_BEFORE		122880
-#define FST_FREQ_AFTER		245760
-#define SND_FREQ_BEFORE		320000
-#define SND_FREQ_AFTER		700800
-#define TRD_FREQ_BEFORE		480000
-#define MAX_CPU_FREQ		1008000
-
-#ifdef CONFIG_INTELLI_PLUG
-int msm_turbo_active(int tactive)
+int msm_turbo(int cpufreq, int param)
 {
-	tactive = turbo_active;
-	return tactive;
-}
-#endif
-
-int msm_turbo(int cpufreq)
-{
-	if (turbo_active) {
+	param = turbo_start_dec(param);
+	if (param) {
 		if (num_online_cpus() == 2) {
-			if (cpufreq == FST_FREQ_BEFORE) {
-				cpufreq = FST_FREQ_AFTER;
+			if (cpufreq == 122880) {
+				cpufreq = 245760;
 				cpu_down(1);
-			} else if (cpufreq == SND_FREQ_BEFORE) {
-				cpufreq = SND_FREQ_AFTER;
+			} else if (cpufreq == 245760) {
+				cpufreq = 480000;
 				cpu_down(1);
-			} else if (cpufreq == TRD_FREQ_BEFORE) {
-				cpufreq = MAX_CPU_FREQ;
+			} else if (cpufreq == 320000) {
+				cpufreq = 700800;
 				cpu_down(1);
-#ifndef CONFIG_CPU_OVERCLOCK
+			} else if (cpufreq == 480000) {
+				cpufreq = 1008000;
+				cpu_down(1);
 			}
-#else
-			} else if (cpufreq > MAX_CPU_FREQ)
-				 if (mc_oc_disabled)
-					cpufreq = MAX_CPU_FREQ;
-#endif
 		}
 	}
 	return cpufreq;

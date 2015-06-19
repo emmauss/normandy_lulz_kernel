@@ -21,8 +21,6 @@
 #include <linux/slab.h>
 #include <linux/input.h>
 #include <linux/cpufreq.h>
-#include <linux/kernel.h>
-#include <linux/cpumask.h>
 
 #ifdef CONFIG_POWERSUSPEND
 #include <linux/powersuspend.h>
@@ -37,7 +35,7 @@
 
 #define INTELLI_PLUG_MAJOR_VERSION	4
 #define INTELLI_PLUG_MINOR_VERSION	0
-#define INTELLI_PLUG_RELMOD_VERSION	5
+#define INTELLI_PLUG_RELMOD_VERSION	7
 
 #define DEF_SAMPLING_MS			(268)
 
@@ -46,13 +44,6 @@
 #define QUAD_PERSISTENCE		(1000 / DEF_SAMPLING_MS)
 
 #define BUSY_PERSISTENCE		(3500 / DEF_SAMPLING_MS)
-
-#define A_FREQ_BEFORE		122880
-#define A_FREQ_AFTER		245760
-#define B_FREQ_BEFORE		320000
-#define B_FREQ_AFTER		700800
-#define C_FREQ_BEFORE		480000
-#define MAX_CPU_FREQ		1008000
 
 static DEFINE_MUTEX(intelli_plug_mutex);
 
@@ -71,7 +62,8 @@ module_param(touch_boost_active, uint, 0664);
 static unsigned int nr_run_profile_sel = 0;
 module_param(nr_run_profile_sel, uint, 0664);
 
-static unsigned int intelli_msm_turbo_active = 1;
+static unsigned int turbo_active = 1;
+module_param(turbo_active, uint, 0444);
 
 #ifdef CONFIG_CPU_OVERCLOCK
 static unsigned int mc_oc_disabled = 0;
@@ -160,7 +152,7 @@ static unsigned int *nr_run_profiles[] = {
 	nr_run_thresholds_disable,
 };
 
-#define NR_RUN_ECO_MODE_PROFILE	3
+#define NR_RUN_ECO_MODE_PROFILE	4
 #define NR_RUN_HYSTERESIS_QUAD	8
 #define NR_RUN_HYSTERESIS_DUAL	4
 
@@ -362,7 +354,7 @@ static void screen_off_limit(bool on)
 
 	/* not active, so exit */
 	if (screen_off_max == UINT_MAX) {
-		intelli_msm_turbo_active = 1;
+		turbo_active = 1;
 		return;
 	}
 
@@ -372,7 +364,7 @@ static void screen_off_limit(bool on)
 
 		if (on) {
 
-			intelli_msm_turbo_active = 0;
+			turbo_active = 0;
 			/* save current instance */
 			l_ip_info->cur_max = policy->max;
 			policy->max = screen_off_max;
@@ -383,7 +375,7 @@ static void screen_off_limit(bool on)
 #endif
 		} else {
 
-			intelli_msm_turbo_active = 1;
+			turbo_active = 1;
 			/* restore */
 			if (cpu != 0) {
 				l_ip_info = &per_cpu(ip_info, 0);
@@ -606,29 +598,9 @@ int __init intelli_plug_init(void)
 	return 0;
 }
 
-int msm_turbo(int cpufreq)
+int turbo_start_dec(void)
 {
-	if (intelli_msm_turbo_active) {
-		if (num_online_cpus() == 2) {
-			if (cpufreq == A_FREQ_BEFORE) {
-				cpufreq = A_FREQ_AFTER;
-				cpu_down(1);
-			} else if (cpufreq == B_FREQ_BEFORE) {
-				cpufreq = B_FREQ_AFTER;
-				cpu_down(1);
-			} else if (cpufreq == C_FREQ_BEFORE) {
-				cpufreq = MAX_CPU_FREQ;
-				cpu_down(1);
-#ifndef CONFIG_CPU_OVERCLOCK
-			}
-#else
-			} else if (cpufreq > MAX_CPU_FREQ)
-				 if (mc_oc_disabled)
-					cpufreq = MAX_CPU_FREQ;
-#endif
-		}
-	}
-	return cpufreq;
+	return turbo_active;
 }
 
 MODULE_AUTHOR("Paul Reioux <reioux@gmail.com> (edit: Lukáš Machata <lukino563@gmail.com>");
