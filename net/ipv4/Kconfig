@@ -580,8 +580,14 @@ choice
 	config DEFAULT_CUBIC
 		bool "Cubic" if TCP_CONG_CUBIC=y
 
+	config DEFAULT_WESTWOOD
+		bool "Westwood" if TCP_CONG_WESTWOOD=y
+
 	config DEFAULT_HTCP
 		bool "Htcp" if TCP_CONG_HTCP=y
+
+	config DEFAULT_HSTCP
+		bool "Highspeed" if TCP_CONG_HSTCP=y
 
 	config DEFAULT_HYBLA
 		bool "Hybla" if TCP_CONG_HYBLA=y
@@ -589,14 +595,20 @@ choice
 	config DEFAULT_VEGAS
 		bool "Vegas" if TCP_CONG_VEGAS=y
 
+	config DEFAULT_SCALABLE
+		bool "Scalable" if TCP_CONG_SCALABLE=y
+
+	config DEFAULT_LP
+		bool "Low powered" if TCP_CONG_LP=y
+
 	config DEFAULT_VENO
 		bool "Veno" if TCP_CONG_VENO=y
 
-	config DEFAULT_WESTWOOD
-		bool "Westwood" if TCP_CONG_WESTWOOD=y
+	config DEFAULT_YEAH
+		bool "Yeah" if TCP_CONG_YEAH=y
 
-	config DEFAULT_RENO
-		bool "Reno"
+	config DEFAULT_ILLINOIS
+		bool "Illinois" if TCP_CONG_ILLINOIS=y
 
 endchoice
 
@@ -611,13 +623,16 @@ config DEFAULT_TCP_CONG
 	string
 	default "bic" if DEFAULT_BIC
 	default "cubic" if DEFAULT_CUBIC
+	default "westwood" if DEFAULT_WESTWOOD
 	default "htcp" if DEFAULT_HTCP
+	default "highspeed" if DEFAULT_HSTCP
 	default "hybla" if DEFAULT_HYBLA
 	default "vegas" if DEFAULT_VEGAS
-	default "westwood" if DEFAULT_WESTWOOD
+	default "scalable" if DEFAULT_SCALABLE
 	default "veno" if DEFAULT_VENO
-	default "reno" if DEFAULT_RENO
-	default "cubic"
+	default "lp" if DEFAULT_LP
+	default "yeah" if DEFAULT_YEAH
+	default "illinois" if DEFAULT_ILLINOIS
 
 config TCP_MD5SIG
 	bool "TCP: MD5 Signature Option support (RFC2385) (EXPERIMENTAL)"
