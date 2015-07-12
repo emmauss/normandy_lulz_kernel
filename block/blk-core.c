@@ -307,7 +307,8 @@ void __blk_run_queue(struct request_queue *q)
 	if (!q->notified_urgent &&
 		q->elevator->type->ops.elevator_is_urgent_fn &&
 		q->urgent_request_fn &&
-		q->elevator->type->ops.elevator_is_urgent_fn(q)) {
+		q->elevator->type->ops.elevator_is_urgent_fn(q) &&
++		list_empty(&q->flush_data_in_flight)) {
 		q->notified_urgent = true;
 		q->urgent_request_fn(q);
 	} else
@@ -1076,14 +1077,14 @@ void blk_requeue_request(struct request_queue *q, struct request *rq)
 	BUG_ON(blk_queued_rq(rq));
 
 if (rq->cmd_flags & REQ_URGENT) {
- /*
+ 	/*
 	* It's not compliant with the design to re-insert
 	* urgent requests. We want to be able to track this
 	* down.
 	*/
- pr_err("%s(): requeueing an URGENT request", __func__);
- WARN_ON(!q->dispatched_urgent);
- q->dispatched_urgent = false;
+ 	pr_debug("%s(): reinserting an URGENT request", __func__);
+ 	WARN_ON(!q->dispatched_urgent);
+ 	q->dispatched_urgent = false;
 }
 	elv_requeue_request(q, rq);
 }
@@ -1101,30 +1102,30 @@ EXPORT_SYMBOL(blk_requeue_request);
  */
 int blk_reinsert_request(struct request_queue *q, struct request *rq)
 {
- if (unlikely(!rq) || unlikely(!q))
- return -EIO;
+	if (unlikely(!rq) || unlikely(!q))
+	return -EIO;
 
- blk_delete_timer(rq);
- blk_clear_rq_complete(rq);
- trace_block_rq_requeue(q, rq);
+	blk_delete_timer(rq);
+	blk_clear_rq_complete(rq);
+	trace_block_rq_requeue(q, rq);
 
- if (blk_rq_tagged(rq))
- blk_queue_end_tag(q, rq);
+	if (blk_rq_tagged(rq))
+	blk_queue_end_tag(q, rq);
 
- BUG_ON(blk_queued_rq(rq));
+	BUG_ON(blk_queued_rq(rq));
 
-if (rq->cmd_flags & REQ_URGENT) {
- /*
+	if (rq->cmd_flags & REQ_URGENT) {
+	/*
 	* It's not compliant with the design to re-insert
 	* urgent requests. We want to be able to track this
 	* down.
 	*/
- pr_err("%s(): requeueing an URGENT request", __func__);
- WARN_ON(!q->dispatched_urgent);
- q->dispatched_urgent = false;
- }
+		pr_debug("%s(): requeueing an URGENT request", __func__);
+		WARN_ON(!q->dispatched_urgent);
+		q->dispatched_urgent = false;
+	}
 
- return elv_reinsert_request(q, rq);
+	return elv_reinsert_request(q, rq);
 }
 EXPORT_SYMBOL(blk_reinsert_request);
 
@@ -1138,9 +1139,9 @@ EXPORT_SYMBOL(blk_reinsert_request);
  */
 bool blk_reinsert_req_sup(struct request_queue *q)
 {
- if (unlikely(!q))
- return false;
- return q->elevator->type->ops.elevator_reinsert_req_fn ? true : false;
+	if (unlikely(!q))
+	return false;
+	return q->elevator->type->ops.elevator_reinsert_req_fn ? true : false;
 }
 EXPORT_SYMBOL(blk_reinsert_req_sup);
 
@@ -1204,8 +1205,8 @@ void __blk_put_request(struct request_queue *q, struct request *req)
 
 	elv_completed_request(q, req);
 
-	/* this is a bio leak */
-	WARN_ON(req->bio != NULL);
+	/* this is a bio leak if the bio is not tagged with BIO_DONTFREE */
+	WARN_ON(req->bio && !bio_flagged(req->bio, BIO_DONTFREE));
 
 	/*
 	 * Request may not have originated from ll_rw_blk. if not,
@@ -2015,6 +2016,10 @@ struct request *blk_peek_request(struct request_queue *q)
 			 * not be passed by new incoming requests
 			 */
 			rq->cmd_flags |= REQ_STARTED;
+			if (rq->cmd_flags & REQ_URGENT) {
+				WARN_ON(q->dispatched_urgent);
+				q->dispatched_urgent = true;
+			}
 			trace_block_rq_issue(q, rq);
 		}
 
@@ -2149,13 +2154,8 @@ struct request *blk_fetch_request(struct request_queue *q)
 	struct request *rq;
 
 	rq = blk_peek_request(q);
-	if (rq) {
-		if (rq->cmd_flags & REQ_URGENT) {
-			WARN_ON(q->dispatched_urgent);
-			q->dispatched_urgent = true;
-		}
+	if (rq)
 		blk_start_request(rq);
-	}
 	return rq;
 }
 EXPORT_SYMBOL(blk_fetch_request);
@@ -2230,6 +2230,15 @@ bool blk_update_request(struct request *req, int error, unsigned int nr_bytes)
 	}
 
 	blk_account_io_completion(req, nr_bytes);
+
+	/*
+	 * Check for this if flagged, Req based dm needs to perform
+	 * post processing, hence dont end bios or request.DM
+	 * layer takes care.
+	 */
+	if (bio_flagged(req->bio, BIO_DONTFREE))
+		return false;
+
 
 	total_bytes = bio_nbytes = 0;
 	while ((bio = req->bio) != NULL) {
