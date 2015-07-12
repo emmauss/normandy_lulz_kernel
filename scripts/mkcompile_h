@@ -34,8 +34,8 @@ if [ -z "$KBUILD_BUILD_VERSION" ]; then
 	if [ -r .version ]; then
 		VERSION=$COMPILE_VERSION
 	else
-		VERSION=7
-		echo 7 > .version
+		VERSION=$COMPILE_VERSION
+		echo $COMPILE_VERSION > .version
 	fi
 else
 	VERSION=$KBUILD_BUILD_VERSION
