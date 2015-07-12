@@ -34,8 +34,6 @@
 #include <asm/cputime.h>
 #include <linux/input.h>
 
-#define MAX_CORES (2)
-
 static int active_count;
 
 struct cpufreq_interactive_cpuinfo {
@@ -135,7 +133,7 @@ static unsigned int up_threshold_any_cpu_load = 95;
 static unsigned int sync_freq = 245760;
 static unsigned int up_threshold_any_cpu_freq = 320000;
 
-static int two_phase_freq_array[MAX_CORES] = {[0 ... MAX_CORES-1] = 700800} ;
+static int two_phase_freq_array[NR_CPUS] = {[0 ... NR_CPUS-1] = 700800} ;
 
 static int cpufreq_governor_intelliactive(struct cpufreq_policy *policy,
 		unsigned int event);
@@ -820,7 +818,7 @@ static ssize_t show_two_phase_freq
 	int i = 0 ;
 	int shift = 0 ;
 	char *buf_pos = buf;
-	for ( i = 0 ; i < MAX_CORES; i++) {
+	for ( i = 0 ; i < NR_CPUS; i++) {
 		shift = sprintf(buf_pos,"%d,",two_phase_freq_array[i]);
 		buf_pos += shift;
 	}
@@ -833,9 +831,17 @@ static ssize_t store_two_phase_freq(struct kobject *a, struct attribute *b,
 {
 
 	int ret = 0;
-	ret = sscanf(buf,"%u,%u",&two_phase_freq_array[0],
-				 &two_phase_freq_array[1]);
-	if (ret < MAX_CORES)
+	if (NR_CPUS == 1)
+		ret = sscanf(buf,"%u",&two_phase_freq_array[0]);
+	else if (NR_CPUS == 2)
+		ret = sscanf(buf,"%u,%u",&two_phase_freq_array[0],
+					 &two_phase_freq_array[1]);
+	else if (NR_CPUS == 4)
+		ret = sscanf(buf, "%u,%u,%u,%u", &two_phase_freq_array[0],
+						 &two_phase_freq_array[1],
+						 &two_phase_freq_array[2],
+						 &two_phase_freq_array[3]);
+	if (ret < NR_CPUS)
 		return -EINVAL;
 
 	return count;
