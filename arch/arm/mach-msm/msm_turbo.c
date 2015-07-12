@@ -18,9 +18,6 @@ int msm_turbo(int cpufreq, int param)
 			if (cpufreq == 122880) {
 				cpufreq = 245760;
 				cpu_down(1);
-			} else if (cpufreq == 245760) {
-				cpufreq = 480000;
-				cpu_down(1);
 			} else if (cpufreq == 320000) {
 				cpufreq = 700800;
 				cpu_down(1);
