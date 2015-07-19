@@ -69,14 +69,15 @@ source "fs/autofs4/Kconfig"
 source "fs/fuse/Kconfig"
 
 config CUSE
-	tristate "Character device in Userspace support"
-	depends on FUSE_FS
-	help
-	  This FUSE extension allows character devices to be
-	  implemented in userspace.
+       tristate "Character device in Userspace support"
+       depends on FUSE_FS
+       help
+         This FUSE extension allows character devices to be
+         implemented in userspace.
 
-	  If you want to develop or use userspace character device
-	  based on CUSE, answer Y or M.
+         If you want to develop or use userspace character device
+         based on CUSE, answer Y or M.
+
 
 config GENERIC_ACL
 	bool
@@ -292,5 +293,11 @@ config DYNAMIC_FSYNC
 	default n
 	help
 	  An experimental file sync control using new power_suspend driver
+
+config AIO_OPTIMIZATION
+	bool "AIO kernel optimization patches"
+	default y
+	help
+	  An experimental AIO FS kernel optimization
 
 endmenu
