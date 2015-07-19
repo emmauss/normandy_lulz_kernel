@@ -680,8 +680,10 @@ static int fuse_readpages_fill(void *_data, struct page *page)
 			return -ENOMEM;
 		}
 
+		lock_page(newpage);
 		err = replace_page_cache_page(oldpage, newpage, GFP_KERNEL);
 		if (err) {
+			unlock_page(newpage);
 			__free_page(newpage);
 			page_cache_release(oldpage);
 			return err;
@@ -691,7 +693,6 @@ static int fuse_readpages_fill(void *_data, struct page *page)
 		 * Decrement the count on new page to make page cache the only
 		 * owner of it
 		 */
-		lock_page(newpage);
 		put_page(newpage);
 
 		/* finally release the old page and swap pointers */
@@ -1005,7 +1006,9 @@ static ssize_t fuse_file_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	if (err)
 		goto out;
 
-	file_update_time(file);
+	err = file_update_time(file);
+	if (err)
+		goto out;
 
 	if (file->f_flags & O_DIRECT) {
 		written = generic_file_direct_write(iocb, iov, &nr_segs,
@@ -1669,30 +1672,17 @@ static int fuse_ioctl_copy_user(struct page **pages, struct iovec *iov,
 	while (iov_iter_count(&ii)) {
 		struct page *page = pages[page_idx++];
 		size_t todo = min_t(size_t, PAGE_SIZE, iov_iter_count(&ii));
-		void *kaddr;
+		size_t left;
 
-		kaddr = kmap(page);
+		if (!to_user)
+			left = iov_iter_copy_from_user(page, &ii, 0, todo);
+		else
+			left = iov_iter_copy_to_user(page, &ii, 0, todo);
 
-		while (todo) {
-			char __user *uaddr = ii.iov->iov_base + ii.iov_offset;
-			size_t iov_len = ii.iov->iov_len - ii.iov_offset;
-			size_t copy = min(todo, iov_len);
-			size_t left;
+		if (unlikely(left))
+			return -EFAULT;
 
-			if (!to_user)
-				left = copy_from_user(kaddr, uaddr, copy);
-			else
-				left = copy_to_user(uaddr, kaddr, copy);
-
-			if (unlikely(left))
-				return -EFAULT;
-
-			iov_iter_advance(&ii, copy);
-			todo -= copy;
-			kaddr += copy;
-		}
-
-		kunmap(page);
+		iov_iter_advance(&ii, todo);
 	}
 
 	return 0;
@@ -2200,20 +2190,63 @@ static ssize_t fuse_loop_dio(struct file *filp, const struct iovec *iov,
 
 
 static ssize_t
-fuse_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
-			loff_t offset, unsigned long nr_segs)
+fuse_direct_IO(int rw, struct kiocb *iocb, struct iov_iter *iter, loff_t offset)
 {
 	ssize_t ret = 0;
 	struct file *file = NULL;
 	loff_t pos = 0;
 
+	/*
+	 * We'll eventually want to work with both iovec and bvec
+	 */
+	BUG_ON(!iov_iter_has_iovec(iter));
+
 	file = iocb->ki_filp;
 	pos = offset;
 
-	ret = fuse_loop_dio(file, iov, nr_segs, &pos, rw);
+	ret = fuse_loop_dio(file, iov_iter_iovec(iter), iter->nr_segs, &pos,
+			    rw);
 
 	return ret;
 }
+
+long fuse_file_fallocate(struct file *file, int mode, loff_t offset,
+			    loff_t length)
+{
+	struct fuse_file *ff = file->private_data;
+	struct fuse_conn *fc = ff->fc;
+	struct fuse_req *req;
+	struct fuse_fallocate_in inarg = {
+		.fh = ff->fh,
+		.offset = offset,
+		.length = length,
+		.mode = mode
+	};
+	int err;
+
+	if (fc->no_fallocate)
+		return -EOPNOTSUPP;
+
+	req = fuse_get_req(fc);
+	if (IS_ERR(req))
+		return PTR_ERR(req);
+
+	req->in.h.opcode = FUSE_FALLOCATE;
+	req->in.h.nodeid = ff->nodeid;
+	req->in.numargs = 1;
+	req->in.args[0].size = sizeof(inarg);
+	req->in.args[0].value = &inarg;
+	fuse_request_send(fc, req);
+	err = req->out.h.error;
+	if (err == -ENOSYS) {
+		fc->no_fallocate = 1;
+		err = -EOPNOTSUPP;
+	}
+	fuse_put_request(fc, req);
+
+	return err;
+}
+EXPORT_SYMBOL_GPL(fuse_file_fallocate);
 
 static const struct file_operations fuse_file_operations = {
 	.llseek		= fuse_file_llseek,
@@ -2232,6 +2265,7 @@ static const struct file_operations fuse_file_operations = {
 	.unlocked_ioctl	= fuse_file_ioctl,
 	.compat_ioctl	= fuse_file_compat_ioctl,
 	.poll		= fuse_file_poll,
+	.fallocate	= fuse_file_fallocate,
 };
 
 static const struct file_operations fuse_direct_io_file_operations = {
@@ -2248,6 +2282,7 @@ static const struct file_operations fuse_direct_io_file_operations = {
 	.unlocked_ioctl	= fuse_file_ioctl,
 	.compat_ioctl	= fuse_file_compat_ioctl,
 	.poll		= fuse_file_poll,
+	.fallocate	= fuse_file_fallocate,
 	/* no splice_read */
 };
 
