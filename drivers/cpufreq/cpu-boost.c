@@ -53,7 +53,7 @@ module_param(sync_threshold, uint, 0644);
 static unsigned int input_boost_freq;
 module_param(input_boost_freq, uint, 0644);
 
-static unsigned int input_boost_ms = 40;
+static unsigned int input_boost_ms;
 module_param(input_boost_ms, uint, 0644);
 
 static u64 last_input_time;
@@ -140,14 +140,11 @@ static int boost_mig_sync_thread(void *data)
 	unsigned long flags;
 
 	while(1) {
-		ret = wait_event_interruptible(s->sync_wq, s->pending ||
+		wait_event_interruptible(s->sync_wq, s->pending ||
 					kthread_should_stop());
 
 		if (kthread_should_stop())
 			break;
-
-		if (ret == -ERESTARTSYS)
-			continue;
 
 		spin_lock_irqsave(&s->lock, flags);
 		s->pending = false;
@@ -162,14 +159,11 @@ static int boost_mig_sync_thread(void *data)
 		if (ret)
 			continue;
 
-		if (dest_policy.cur >= src_policy.cur ) {
-			pr_debug("No sync. CPU%d@%dKHz >= CPU%d@%dKHz\n",
-				 dest_cpu, dest_policy.cur, src_cpu, src_policy.cur);
+		if (src_policy.cur == src_policy.cpuinfo.min_freq) {
+			pr_debug("No sync. Source CPU%d@%dKHz at min freq\n",
+				 src_cpu, src_policy.cur);
 			continue;
 		}
-
-		if (sync_threshold && (dest_policy.cur >= sync_threshold))
-			continue;
 
 		cancel_delayed_work_sync(&s->boost_rem);
 		if (sync_threshold) {
@@ -202,6 +196,10 @@ static int boost_migration_notify(struct notifier_block *nb,
 	struct cpu_sync *s = &per_cpu(sync_info, dest_cpu);
 
 	if (!boost_ms)
+		return NOTIFY_OK;
+
+	/* Avoid deadlock in try_to_wake_up() */
+	if (s->thread == current)
 		return NOTIFY_OK;
 
 	pr_debug("Migration: CPU%d --> CPU%d\n", (int) arg, (int) dest_cpu);
@@ -364,3 +362,4 @@ static int cpu_boost_init(void)
 	return 0;
 }
 late_initcall(cpu_boost_init);
+
