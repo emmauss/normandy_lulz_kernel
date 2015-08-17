@@ -65,7 +65,6 @@ wfi_done:
 #endif
 	bx	lr
 #endif
-ENDPROC(msm_arch_idle)
 
 ENTRY(msm_pm_collapse)
 #if defined(CONFIG_MSM_FIQ_SUPPORT)
@@ -84,9 +83,7 @@ ENTRY(msm_pm_collapse)
 	add	r0, r0, r1
 #endif
 
-ARM(	stmia   r0!, {r4-r14}	)
-THUMB(	str	r4, [r0],#4	)
-THUMB(	str	r14, [r0],#4	)
+	stmia   r0!, {r4-r14}
 	mrc     p15, 0, r1, c1, c0, 0 /* MMU control */
 	mrc     p15, 0, r2, c2, c0, 0 /* TTBR0 */
 	mrc     p15, 0, r3, c3, c0, 0 /* dacr */
@@ -129,7 +126,6 @@ THUMB(	str	r14, [r0],#4	)
 	mov	r2, #1
 	and	r1, r2, r1, ASR #30 /* Check if the cache is write back */
 	orr	r1, r0, r1
-	and	r1, r1, #1
 	cmp	r1, #1
 	bne	skip
 	bl	v7_flush_dcache_all
@@ -181,15 +177,12 @@ skip:
 	mul	r2, r2, r1
 	add	r0, r0, r2
 #endif
-ARM(	ldmfd   r0, {r4-r14}	)		 /* restore sp and lr */
-THUMB(	ldr	r4, [r0],#4	)
-THUMB(	ldr	r14, [r0],#4	)
+	ldmfd   r0, {r4-r14}		 /* restore registers */
 	mov     r0, #0                   /* return power collapse failed */
 
 	MARKER	idle_v7_start_ptr 0x6 0x9 0x1
 
 	bx      lr
-ENDPROC(msm_pm_collapse)
 
 ENTRY(msm_pm_collapse_exit)
 #if 0 /* serial debug */
@@ -239,9 +232,7 @@ ENTRY(msm_pm_collapse_exit)
 	mcr     p15, 0, r10, c13, c0, 3 /* TPIDRURO */
 	mcr     p15, 0, r11, c13, c0, 1 /* context ID */
 	isb
-ARM(	ldmdb   r1!, {r4-r14}	)
-THUMB(	ldr	r14, [r1, #-4]!	)
-THUMB(	ldr	r4, [r1, #-4]!	)
+	ldmdb   r1!, {r4-r14}
 	ldr	r0, =msm_pm_pc_pgd
 	ldr	r1, =msm_pm_collapse_exit
 	adr	r3, msm_pm_collapse_exit
@@ -296,15 +287,8 @@ msm_pm_pa_to_va:
 	nop
 	nop
 1:	b       1b
-ENDPROC(msm_pm_collapse_exit)
-
-	.arm
 
 ENTRY(msm_pm_boot_entry)
-THUMB(	adr	r9, BSYM(2f)	)	/* Kernel is always entered in ARM. */
-THUMB(	bx	r9		)	/* If this is a Thumb-2 kernel, */
-THUMB(	.thumb			)	/* switch to Thumb now.		*/
-THUMB(2:			)
 	MARKER  IDLE_V7_START_PHY 0x7 0xA 0x0
 	mrc     p15, 0, r0, c0, c0, 5    /* MPIDR                          */
 	and     r0, r0, #15              /* what CPU am I                  */
@@ -317,13 +301,11 @@ THUMB(2:			)
 	MARKER  IDLE_V7_START_PHY 0x8 0xB 0x0
 
 	ldr     pc, [r1]                 /* jump                           */
-ENDPROC(msm_pm_boot_entry)
 
 ENTRY(msm_pm_set_l2_flush_flag)
 	ldr r1, =msm_pm_flush_l2_flag
 	str r0, [r1]
 	bx lr
-ENDPROC(msm_pm_set_l2_flush_flag)
 
 	.data
 
