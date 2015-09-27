@@ -51,6 +51,13 @@ static struct backing_dev_info ramfs_backing_dev_info = {
 			  BDI_CAP_READ_MAP | BDI_CAP_WRITE_MAP | BDI_CAP_EXEC_MAP,
 };
 
+static const struct address_space_operations ramfs_aops = {
+	.readpage	= simple_readpage,
+	.write_begin	= simple_write_begin,
+	.write_end	= simple_write_end,
+	.set_page_dirty	= __set_page_dirty_no_writeback,
+};
+
 struct inode *ramfs_get_inode(struct super_block *sb,
 				const struct inode *dir, umode_t mode, dev_t dev)
 {
@@ -114,7 +121,7 @@ static int ramfs_mkdir(struct inode * dir, struct dentry * dentry, umode_t mode)
 	return retval;
 }
 
-static int ramfs_create(struct inode *dir, struct dentry *dentry, umode_t mode, struct nameidata *nd)
+static int ramfs_create(struct inode *dir, struct dentry *dentry, umode_t mode, bool excl)
 {
 	return ramfs_mknod(dir, dentry, mode | S_IFREG, 0);
 }
@@ -261,17 +268,23 @@ static struct file_system_type ramfs_fs_type = {
 	.mount		= ramfs_mount,
 	.kill_sb	= ramfs_kill_sb,
 };
+
 static struct file_system_type rootfs_fs_type = {
 	.name		= "rootfs",
 	.mount		= rootfs_mount,
 	.kill_sb	= kill_litter_super,
 };
 
-static int __init init_ramfs_fs(void)
+int __init init_ramfs_fs(void)
 {
+	static unsigned long once;
+
+	if (test_and_set_bit(0, &once))
+		return 0;
 	return register_filesystem(&ramfs_fs_type);
 }
-module_init(init_ramfs_fs)
+
+fs_initcall(init_ramfs_fs);
 
 int __init init_rootfs(void)
 {
