@@ -32,10 +32,10 @@ export LC_ALL
 
 if [ -z "$KBUILD_BUILD_VERSION" ]; then
 	if [ -r .version ]; then
-		VERSION=8
+		VERSION=9
 	else
-		VERSION=8
-		echo 8 > .version
+		VERSION=9
+		echo 9 > .version
 	fi
 else
 	VERSION=$KBUILD_BUILD_VERSION
