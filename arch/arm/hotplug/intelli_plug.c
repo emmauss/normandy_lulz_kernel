@@ -53,7 +53,7 @@ static struct delayed_work intelli_plug_boost;
 static struct workqueue_struct *intelliplug_wq;
 static struct workqueue_struct *intelliplug_boost_wq;
 
-static unsigned int intelli_plug_active = 1;
+static unsigned int intelli_plug_active = 0;
 module_param(intelli_plug_active, uint, 0664);
 
 static unsigned int touch_boost_active = 1;
@@ -64,11 +64,6 @@ module_param(nr_run_profile_sel, uint, 0664);
 
 static unsigned int turbo_active = 1;
 module_param(turbo_active, uint, 0444);
-
-#ifdef CONFIG_CPU_OVERCLOCK
-static unsigned int mc_oc_disabled = 0;
-module_param(mc_oc_disabled, uint, 0664);
-#endif
 
 //default to something sane rather than zero
 static unsigned int sampling_time = DEF_SAMPLING_MS;
