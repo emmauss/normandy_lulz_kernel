@@ -431,7 +431,7 @@ config ARCH_MSM7X27A
 	select ARCH_MSM_CORTEXMP
 	select MIGHT_HAVE_CACHE_L2X0
 	select ARM_HAS_SG_CHAIN
-	select MSM_FIQ_SUPPORT
+	#select MSM_FIQ_SUPPORT
 	select CPU_HAS_L2_PMU
 
 config  MSM_VIC
@@ -2626,7 +2626,7 @@ config HAS_MACH_MEMUTILS
 	default y
 	bool "Motorola MSM memcpy enhancements"
 	help
-	Faster memcpy performance for Snapdragon.
+	Faster memcpy performance for Snapdragon
 
 config MSM_OVERCLOCK_GPU
 	bool "Enables overclocking of adreno 203 gpu."
