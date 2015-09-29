@@ -16,7 +16,7 @@ module_param(active, uint, 0444);
 int msm_turbo(int cpufreq)
 {
 	active = turbo_start_dec(active);
-	if ((active > 0)) {
+	if (active > 0) {
 		if (num_online_cpus() == 2) {
 			if (cpufreq == 122880) {
 				cpufreq = 245760;
