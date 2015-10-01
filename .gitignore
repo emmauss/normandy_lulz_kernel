@@ -8,6 +8,12 @@
 # Java class files
 *.class
 
+# Editor and patch files
+*.old
+*.rej
+*.orig
+*~
+
 # Generated files
 bin/
 gen/
